@@ -1,0 +1,106 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install musl (fully static binary, runs on any x86_64 Linux)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq musl-tools
+      - name: Build
+        run: musl-gcc -O2 -Wall -Wextra -static -o multiping-linux-x86_64 multiping.c -lpthread
+      - name: Smoke test
+        run: |
+          ./multiping-linux-x86_64 -h
+          timeout 4 ./multiping-linux-x86_64 -n -c 127.0.0.1 10.255.254.1 > out.txt || true
+          tail -c 600 out.txt
+          grep -q ' UP ' out.txt && grep -q 'DOWN' out.txt
+          file multiping-linux-x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: multiping-linux-x86_64
+          path: multiping-linux-x86_64
+
+  windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mingw-w64
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq mingw-w64
+      - name: Build
+        run: x86_64-w64-mingw32-gcc -O2 -Wall -Wextra -static -o multiping.exe multiping.c -liphlpapi -lws2_32
+      - uses: actions/upload-artifact@v4
+        with:
+          name: multiping-windows-x86_64
+          path: multiping.exe
+
+  windows-test:
+    needs: windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: multiping-windows-x86_64
+      - name: Smoke test on real Windows
+        shell: pwsh
+        run: |
+          .\multiping.exe -h
+          $p = Start-Process -FilePath .\multiping.exe -ArgumentList '-n','-c','127.0.0.1','10.255.254.1' -RedirectStandardOutput out.txt -PassThru -NoNewWindow
+          Start-Sleep -Seconds 5
+          Stop-Process -Id $p.Id -Force
+          Get-Content out.txt -Tail 8
+          if (-not (Select-String -Path out.txt -Pattern ' UP ' -Quiet)) { Write-Error "no UP line"; exit 1 }
+          if (-not (Select-String -Path out.txt -Pattern 'DOWN' -Quiet)) { Write-Error "no DOWN line"; exit 1 }
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build (arm64)
+        run: cc -O2 -Wall -Wextra -o multiping-macos-arm64 multiping.c
+      - name: Smoke test
+        run: |
+          ./multiping-macos-arm64 -h
+          ./multiping-macos-arm64 -n -c 127.0.0.1 10.255.254.1 > out.txt & pid=$!
+          sleep 4; kill $pid || true
+          tail -c 600 out.txt
+          grep -q ' UP ' out.txt && grep -q 'DOWN' out.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: multiping-macos-arm64
+          path: multiping-macos-arm64
+
+  release:
+    needs: [linux, windows, windows-test, macos]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la dist
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag="${GITHUB_REF#refs/tags/}"
+            gh release create "$tag" --title "multiping $tag" --notes "multiping $tag" dist/*
+          else
+            git tag -f latest && git push -f origin latest
+            gh release view latest >/dev/null 2>&1 || gh release create latest --prerelease --title "Latest build" --notes "Rolling build from main"
+            gh release edit latest --notes "Rolling build from main, commit ${GITHUB_SHA::7}. Download: multiping-linux-x86_64 (static), multiping.exe (Windows x64), multiping-macos-arm64."
+            gh release upload latest dist/* --clobber
+          fi

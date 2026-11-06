@@ -33,6 +33,11 @@ Options: `-i SEC` interval, `-t SEC` timeout, `-d N` misses before DOWN,
 The title line shows which method is active (`icmp`, `raw icmp`, `via ping`).
 IPv4 only for now.
 
+## Downloads
+
+Every push builds Linux (static x86_64), Windows (x64 .exe) and macOS (arm64)
+binaries. Grab them from the **latest** release on GitHub.
+
 ## Build
 
     make                 # Linux / macOS

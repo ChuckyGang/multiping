@@ -43,12 +43,14 @@
 #  include <icmpapi.h>
 #  include <conio.h>
 #  include <process.h>
+#  define strcasecmp _stricmp
 typedef CRITICAL_SECTION mutex_t;
 #  define mutex_init(m)   InitializeCriticalSection(m)
 #  define mutex_lock(m)   EnterCriticalSection(m)
 #  define mutex_unlock(m) LeaveCriticalSection(m)
 #else
 #  include <pthread.h>
+#  include <strings.h>
 #  include <unistd.h>
 #  include <fcntl.h>
 #  include <signal.h>
