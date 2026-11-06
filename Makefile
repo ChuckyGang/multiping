@@ -20,3 +20,8 @@ clean:
 	rm -f multiping multiping.exe
 
 .PHONY: all windows clean
+
+amiga:
+	$(MAKE) -C amiga
+
+.PHONY: amiga

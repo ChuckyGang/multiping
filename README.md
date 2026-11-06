@@ -46,6 +46,7 @@ On that page, scroll down to **Assets** and pick your file:
 | `multiping.exe`          | Windows 10/11, 64-bit                 |
 | `multiping-linux-x86_64` | any 64-bit Linux (static, no libs)    |
 | `multiping-macos-arm64`  | macOS on Apple Silicon                |
+| `multiping-amiga`        | AmigaOS 2.0+, any 68k, needs a TCP/IP stack (see below) |
 
 On Linux/macOS run `chmod +x` on the file first. Every push to `main`
 rebuilds these, so "latest" is always the newest code.
@@ -56,4 +57,25 @@ rebuilds these, so "latest" is always the newest code.
     make windows         # needs mingw-w64: x86_64-w64-mingw32-gcc, produces multiping.exe
     cl /O2 multiping.c iphlpapi.lib ws2_32.lib      # MSVC
 
+    make amiga           # AmigaOS build, needs the Bartman toolchain (see amiga/Makefile)
+
 `python/multiping.py` is the earlier Python version, same screen and keys.
+
+## Amiga version
+
+`amiga/` holds a separate port for AmigaOS 2.0+ on any 68000 or better. It
+needs a running TCP/IP stack with `bsdsocket.library` that allows raw ICMP
+sockets: AmiTCP, Miami, Genesis and Roadshow all do. Same screen, same
+keys, same hosts-file format, in the Shell window (or its own console
+window when started from Workbench).
+
+    multiping 192.168.1.1 fileserver=192.168.1.10 amiga.org
+    multiping FILE=work:hosts.txt INTERVAL=2 TIMEOUT=1500 LOG=ram:ping.log
+
+    HOSTS/M,FILE/K,INTERVAL=I/K/N,TIMEOUT=T/K/N,DOWNAFTER=D/K/N,LOG/K,BEEP/S,NOSAVE/S,NOCOLOR/S
+
+Differences from the other builds: the hosts file defaults to
+`S:multiping_hosts`, INTERVAL is in seconds and TIMEOUT in milliseconds,
+and UP/DOWN are shown as pen 3 / inverse video rather than green / red,
+because a stock 4-colour Workbench has neither. Built with the
+Bartman/Abyss ELF toolchain, no C library, 23 KB executable.

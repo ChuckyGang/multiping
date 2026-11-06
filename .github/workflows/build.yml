@@ -81,9 +81,47 @@ jobs:
           name: multiping-macos-arm64
           path: multiping-macos-arm64
 
+  amiga:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Bartman toolchain
+        id: bartman-cache
+        uses: actions/cache@v4
+        with:
+          path: bartman
+          key: bartman-amiga-debug-1.8.2
+      - name: Fetch Bartman toolchain (m68k-amiga-elf-gcc + elf2hunk, from the amiga-debug VS Code extension)
+        if: steps.bartman-cache.outputs.cache-hit != 'true'
+        env:
+          BARTMAN_VERSION: 1.8.2
+        run: |
+          curl -fsSL -o bartman.vsix \
+            "https://bartmanabyss.gallery.vsassets.io/_apis/public/gallery/publisher/bartmanabyss/extension/amiga-debug/${BARTMAN_VERSION}/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage"
+          unzip -q bartman.vsix -d bartman
+          rm bartman.vsix
+      - name: Build
+        run: |
+          BARTMAN="$PWD/bartman/extension/bin/linux"
+          chmod +x "$BARTMAN/elf2hunk"
+          find "$BARTMAN/opt/bin" "$BARTMAN/opt/libexec" "$BARTMAN/opt/m68k-amiga-elf/bin" -type f -exec chmod +x {} +
+          make -C amiga BARTMAN="$BARTMAN"
+          cp amiga/out/multiping multiping-amiga
+          ls -la multiping-amiga
+      - name: Smoke test under vamos (no TCP/IP stack there, expects the clean "bsdsocket.library not found" exit)
+        run: |
+          pip install amitools machine68k==0.3.0 -q
+          printf '10.0.0.1 router\n10.0.0.2\n' > hosts.txt
+          vamos -q multiping-amiga FILE=hosts.txt 1.1.1.1=cf 2>&1 | tee out.txt
+          grep -q 'bsdsocket.library not found' out.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: multiping-amiga
+          path: multiping-amiga
+
   release:
-    needs: [linux, windows, windows-test, macos]
-    if: always() && github.event_name == 'push' && needs.linux.result == 'success' && needs.windows-test.result == 'success'
+    needs: [linux, windows, windows-test, macos, amiga]
+    if: always() && github.event_name == 'push' && needs.linux.result == 'success' && needs.windows-test.result == 'success' && needs.amiga.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -102,6 +140,6 @@ jobs:
           else
             git tag -f latest && git push -f origin latest
             gh release view latest >/dev/null 2>&1 || gh release create latest --prerelease --title "Latest build" --notes "Rolling build from main"
-            gh release edit latest --notes "Rolling build from main, commit ${GITHUB_SHA::7}. Download: multiping-linux-x86_64 (static), multiping.exe (Windows x64), multiping-macos-arm64."
+            gh release edit latest --notes "Rolling build from main, commit ${GITHUB_SHA::7}. Download: multiping-linux-x86_64 (static), multiping.exe (Windows x64), multiping-macos-arm64, multiping-amiga (AmigaOS 68k)."
             gh release upload latest dist/* --clobber
           fi

@@ -2,3 +2,5 @@ multiping
 multiping.exe
 *.o
 __pycache__/
+amiga/obj/
+amiga/out/
