@@ -2,7 +2,8 @@
 
 Ping many hosts at once, one line per host. Green = answering, red = not.
 One C file, no dependencies, one static binary per platform. Linux, macOS,
-Windows. No admin/root needed in normal use.
+Windows, and a separate port for AmigaOS (68k). No admin/root needed in
+normal use.
 
     multiping 192.168.10.1 pikvm=192.168.10.236 google.com
     multiping -f hosts.txt
@@ -29,6 +30,7 @@ Options: `-i SEC` interval, `-t SEC` timeout, `-d N` misses before DOWN,
 | Windows | `IcmpSendEcho()` (iphlpapi), works as a normal user                    |
 | Linux   | ICMP datagram socket if `net.ipv4.ping_group_range` allows it (most distros), else raw socket (root / `setcap cap_net_raw+ep multiping`), else it runs the system `ping` and parses the time |
 | macOS   | ICMP datagram socket, always allowed                                   |
+| AmigaOS | raw ICMP socket via `bsdsocket.library` (AmiTCP, Miami, Genesis, Roadshow), see below |
 
 The title line shows which method is active (`icmp`, `raw icmp`, `via ping`).
 IPv4 only for now.
@@ -73,6 +75,10 @@ window when started from Workbench).
     multiping FILE=work:hosts.txt INTERVAL=2 TIMEOUT=1500 LOG=ram:ping.log
 
     HOSTS/M,FILE/K,INTERVAL=I/K/N,TIMEOUT=T/K/N,DOWNAFTER=D/K/N,LOG/K,BEEP/S,NOSAVE/S,NOCOLOR/S
+
+Tested on real hardware is still pending; verified in Amiberry on WB3.2.3/68060
+with its bsdsocket emulation (note: Amiberry as Flatpak or as a normal user
+cannot open raw sockets, so there it exits with errno 1).
 
 Differences from the other builds: the hosts file defaults to
 `S:multiping_hosts`, INTERVAL is in seconds and TIMEOUT in milliseconds,
