@@ -85,6 +85,9 @@ static struct {
 } cfg = { 1000, 1000, 1, 0, 0, 1, "S:multiping_hosts", NULL };
 
 static BPTR g_in, g_out, g_con;
+static int g_verbose;
+
+#define TRACE(msg) do { if (g_verbose) con_write("multiping: " msg "\n"); } while (0)
 static LONG g_sock = -1;
 static UWORD g_icmp_id;
 static ULONG g_base_secs;
@@ -745,8 +748,8 @@ static void close_timer(void)
 
 int main(void)
 {
-    static const char template_[] = "HOSTS/M,FILE/K,INTERVAL=I/K/N,TIMEOUT=T/K/N,DOWNAFTER=D/K/N,LOG/K,BEEP/S,NOSAVE/S,NOCOLOR/S";
-    LONG args[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    static const char template_[] = "HOSTS/M,FILE/K,INTERVAL=I/K/N,TIMEOUT=T/K/N,DOWNAFTER=D/K/N,LOG/K,BEEP/S,NOSAVE/S,NOCOLOR/S,VERBOSE/S";
+    LONG args[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     struct RDArgs *rda = NULL;
     int rc = RETURN_OK, i;
     ULONG last_render = 0, last_sizeq = 0;
@@ -777,6 +780,7 @@ int main(void)
         if (args[6]) cfg.beep = 1;
         if (args[7]) cfg.nosave = 1;
         if (args[8]) cfg.color = 0;
+        if (args[9]) g_verbose = 1;
     }
 
     load_hosts(cfg.file);
@@ -796,15 +800,18 @@ int main(void)
         goto out;
     }
 
+    TRACE("hosts loaded, opening timer.device");
     if (!open_timer()) { con_write("multiping: cannot open timer.device\n"); rc = RETURN_FAIL; goto out; }
     g_base_secs = now_secs();
 
+    TRACE("opening bsdsocket.library");
     SocketBase = OpenLibrary("bsdsocket.library", 2);
     if (!SocketBase) {
         con_write("multiping: bsdsocket.library not found - is the TCP/IP stack running?\n");
         rc = RETURN_FAIL;
         goto out;
     }
+    TRACE("opening raw ICMP socket");
     g_sock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     if (g_sock < 0) {
         char s[16];
@@ -815,6 +822,26 @@ int main(void)
         goto out;
     }
     g_icmp_id = (UWORD)((ULONG)FindTask(NULL) >> 2);
+    TRACE("socket open, resolving + sending first pings (console goes RAW after this)");
+    if (g_verbose) {
+        for (i = 0; i < g_nhosts; i++) {
+            char s[16];
+            con_write("multiping: resolve "); con_write(g_hosts[i].name);
+            if (resolve(&g_hosts[i], now_ms())) { con_write(" ok, send "); con_write(send_ping(&g_hosts[i]) ? "ok" : "FAILED"); }
+            else con_write(" FAILED");
+            fmt_u(s, (ULONG)Errno()); con_write(" (errno "); con_write(s); con_write(")\n");
+        }
+        {
+            fd_set rf; struct timeval tv; ULONG sigs = SIGBREAKF_CTRL_C; LONG n; char s[16];
+            FD_ZERO(&rf); FD_SET(g_sock, &rf); tv.tv_secs = 2; tv.tv_micro = 0;
+            con_write("multiping: WaitSelect 2s...");
+            n = WaitSelect(g_sock + 1, &rf, NULL, NULL, &tv, &sigs);
+            fmt_u(s, (ULONG)n); con_write(" returned "); con_write(s); con_write("\n");
+            if (n > 0) { con_write("multiping: recvfrom..."); handle_reply(); con_write(" done\n"); }
+        }
+        con_write("multiping: entering screen mode\n");
+        Delay(100);
+    }
 
     SetMode(g_in, 1);                                    /* RAW console: keys arrive immediately */
     if (cfg.color) con_write(CSI "0 p");                 /* cursor off */
