@@ -85,9 +85,27 @@ static struct {
 } cfg = { 1000, 1000, 1, 0, 0, 1, "S:multiping_hosts", NULL };
 
 static BPTR g_in, g_out, g_con;
+#ifdef DEBUG_TRACE
+static int g_verbose = 1;
+#else
 static int g_verbose;
+#endif
 
+#ifdef DEBUG_TRACE
+/* debug build: every trace line goes to DH9:trace.txt, opened and closed per line */
+static void dbg_line(const char *msg)
+{
+    BPTR f = Open("DH9:trace.txt", MODE_READWRITE);
+    if (!f) return;
+    Seek(f, 0, OFFSET_END);
+    Write(f, (APTR)msg, (LONG)strlen(msg));
+    Write(f, "\n", 1);
+    Close(f);
+}
+#define TRACE(msg) dbg_line("multiping: " msg)
+#else
 #define TRACE(msg) do { if (g_verbose) con_write("multiping: " msg "\n"); } while (0)
+#endif
 static LONG g_sock = -1;
 static UWORD g_icmp_id;
 static ULONG g_base_secs;
@@ -765,6 +783,7 @@ int main(void)
     } else {
         g_in = Input();
         g_out = Output();
+        TRACE("dos open, have Input/Output, calling ReadArgs");
         rda = ReadArgs((STRPTR)template_, args, NULL);
         if (!rda) {
             PrintFault(IoErr(), "multiping");
@@ -783,7 +802,9 @@ int main(void)
         if (args[9]) g_verbose = 1;
     }
 
+    TRACE("ReadArgs done, loading hosts file");
     load_hosts(cfg.file);
+    TRACE("hosts file done");
     if (args[0]) {
         char **hp = (char **)args[0];
         while (*hp) {
@@ -794,7 +815,9 @@ int main(void)
         }
     }
     if (g_nhosts == 0) {
+        TRACE("no hosts: printing usage");
         usage();
+        TRACE("usage printed");
         con_write("\nno hosts given and nothing in "); con_write(cfg.file); con_write("\n");
         rc = RETURN_ERROR;
         goto out;
@@ -891,11 +914,15 @@ int main(void)
     SetMode(g_in, 0);
 
 out:
+    TRACE("cleanup: socket");
     if (g_sock >= 0) CloseSocket(g_sock);
     if (SocketBase) CloseLibrary(SocketBase);
+    TRACE("cleanup: timer");
     close_timer();
+    TRACE("cleanup: FreeArgs");
     if (rda) FreeArgs(rda);
     if (g_con) Close(g_con);
+    TRACE("cleanup: closing dos, returning");
     CloseLibrary((struct Library *)DOSBase);
     return rc;
 }

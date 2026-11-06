@@ -16,7 +16,7 @@ SDKDIR   := $(BARTMAN)/opt/m68k-amiga-elf/sys-include
 CCFLAGS = -MP -MMD -m68000 -O2 -nostdlib \
           -Wall -Wextra -Wno-unused-function -Wno-pointer-sign -Wno-array-bounds -Wno-volatile-register-var \
           -DNO_INLINE_STDARG \
-          -fomit-frame-pointer -fno-tree-loop-distribution \
+          -fomit-frame-pointer -fno-tree-loop-distribute-patterns -fno-builtin \
           -fno-exceptions -ffunction-sections -fdata-sections \
           -Isrc -I$(SDKDIR)
 
