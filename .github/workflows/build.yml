@@ -110,7 +110,7 @@ jobs:
           ls -la multiping-amiga
       - name: Smoke test under vamos (no TCP/IP stack there, expects the clean "bsdsocket.library not found" exit)
         run: |
-          pip install amitools machine68k==0.3.0 -q
+          pip install amitools machine68k==0.3.0 greenlet -q
           printf '10.0.0.1 router\n10.0.0.2\n' > hosts.txt
           vamos -q multiping-amiga FILE=hosts.txt 1.1.1.1=cf 2>&1 | tee out.txt
           grep -q 'bsdsocket.library not found' out.txt
