@@ -1,0 +1,4 @@
+multiping
+multiping.exe
+*.o
+__pycache__/
