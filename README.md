@@ -35,8 +35,20 @@ IPv4 only for now.
 
 ## Downloads
 
-Every push builds Linux (static x86_64), Windows (x64 .exe) and macOS (arm64)
-binaries. Grab them from the **latest** release on GitHub.
+Ready-built binaries, no install needed:
+
+**https://github.com/ChuckyGang/multiping/releases/tag/latest**
+
+On that page, scroll down to **Assets** and pick your file:
+
+| File                     | For                                   |
+|--------------------------|---------------------------------------|
+| `multiping.exe`          | Windows 10/11, 64-bit                 |
+| `multiping-linux-x86_64` | any 64-bit Linux (static, no libs)    |
+| `multiping-macos-arm64`  | macOS on Apple Silicon                |
+
+On Linux/macOS run `chmod +x` on the file first. Every push to `main`
+rebuilds these, so "latest" is always the newest code.
 
 ## Build
 
