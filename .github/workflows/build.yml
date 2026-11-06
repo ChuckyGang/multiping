@@ -64,6 +64,7 @@ jobs:
 
   macos:
     runs-on: macos-latest
+    continue-on-error: true   # mac runners are often unavailable; don't block the release
     steps:
       - uses: actions/checkout@v4
       - name: Build (arm64)
@@ -82,7 +83,7 @@ jobs:
 
   release:
     needs: [linux, windows, windows-test, macos]
-    if: github.event_name == 'push'
+    if: always() && github.event_name == 'push' && needs.linux.result == 'success' && needs.windows-test.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
